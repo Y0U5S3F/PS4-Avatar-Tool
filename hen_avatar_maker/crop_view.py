@@ -24,6 +24,7 @@ class CropView(tk.Canvas):
         self.on_change = on_change
         self.source_image: Image.Image | None = None
         self.preview_photo: ImageTk.PhotoImage | None = None
+        self._display_cache: tuple[tuple[int, int], float, ImageTk.PhotoImage] | None = None
         self.image_scale = 1.0
         self.offset_x = 0.0
         self.offset_y = 0.0
@@ -59,7 +60,8 @@ class CropView(tk.Canvas):
         old_size = self.crop_size
         self._update_crop_size()
         if old_size != self.crop_size and self.source_image is not None:
-            self._fit_image()
+            self._ensure_crop_is_covered()
+            self._clamp_offset()
         self.redraw()
 
     def _update_crop_size(self) -> None:
@@ -77,9 +79,19 @@ class CropView(tk.Canvas):
         canvas_height = max(self.winfo_height(), self.crop_size + 20)
         fit = min(canvas_width / width, canvas_height / height)
         self.image_scale = max(required, fit)
+        self._display_cache = None
         self.offset_x = self.winfo_width() / 2
         self.offset_y = self.winfo_height() / 2
         self._clamp_offset()
+
+    def _ensure_crop_is_covered(self) -> None:
+        """Increase scale only when a resize makes the crop larger than the image coverage."""
+        if self.source_image is None:
+            return
+        minimum_scale = self.crop_size / min(self.source_image.size)
+        if self.image_scale < minimum_scale:
+            self.image_scale = minimum_scale
+            self._display_cache = None
 
     def _scaled_size(self) -> tuple[int, int]:
         if self.source_image is None:
@@ -125,6 +137,7 @@ class CropView(tk.Canvas):
         relative_x = (mouse_x - self.offset_x) / old_scale
         relative_y = (mouse_y - self.offset_y) / old_scale
         self.image_scale = new_scale
+        self._display_cache = None
         self.offset_x = mouse_x - relative_x * new_scale
         self.offset_y = mouse_y - relative_y * new_scale
         self._clamp_offset()
@@ -190,9 +203,14 @@ class CropView(tk.Canvas):
             self._draw_empty_state(width, height)
             return
 
-        scaled_width, scaled_height = self._scaled_size()
-        display = self.source_image.resize((scaled_width, scaled_height), Image.Resampling.LANCZOS)
-        self.preview_photo = ImageTk.PhotoImage(display)
+        scaled_size = self._scaled_size()
+        cache_key = (scaled_size, round(self.image_scale, 4))
+        if self._display_cache is None or self._display_cache[:2] != cache_key:
+            display = self.source_image.resize(scaled_size, Image.Resampling.LANCZOS)
+            self.preview_photo = ImageTk.PhotoImage(display, master=self)
+            self._display_cache = (scaled_size, cache_key[1], self.preview_photo)
+        else:
+            self.preview_photo = self._display_cache[2]
         self.create_image(self.offset_x, self.offset_y, image=self.preview_photo)
 
         x1, y1, x2, y2 = self._crop_box()
@@ -229,29 +247,10 @@ class CropView(tk.Canvas):
         )
 
     def _draw_empty_state(self, width: int, height: int) -> None:
-        margin = 54
-        x1, y1, x2, y2 = margin, margin, width - margin, height - margin
-        self.create_rectangle(
-            x1,
-            y1,
-            x2,
-            y2,
-            outline=THEME.panel_border_light,
-            width=2,
-            dash=(7, 7),
-        )
-
-        center_x = width / 2
-        center_y = height / 2
-        self.create_line(center_x, center_y - 54, center_x, center_y - 83, fill=THEME.muted, width=3, capstyle="round")
-        self.create_line(center_x, center_y - 83, center_x - 10, center_y - 72, fill=THEME.muted, width=3, capstyle="round")
-        self.create_line(center_x, center_y - 83, center_x + 10, center_y - 72, fill=THEME.muted, width=3, capstyle="round")
-        self.create_text(center_x, center_y - 30, text="Drop Image Here", fill=THEME.text, font=("Segoe UI", 13, "bold"))
-        self.create_text(center_x, center_y - 2, text="or", fill=THEME.muted, font=("Segoe UI", 9))
-        self.create_text(center_x, center_y + 25, text="Click to Import", fill=THEME.text, font=("Segoe UI", 12, "bold"))
+        """Keep the canvas visually quiet while the import widget owns the CTA."""
         self.create_text(
-            center_x,
-            y2 + 22,
+            width / 2,
+            height - 30,
             text="Choose a square area, then drag and zoom to frame it",
             fill=THEME.muted,
             font=("Segoe UI", 9),
