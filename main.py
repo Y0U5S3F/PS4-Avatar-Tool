@@ -1,4 +1,4 @@
-from ps4_avatar_tool_gui import main
+from ps4_avatar_tool import main
 
 
 if __name__ == "__main__":
