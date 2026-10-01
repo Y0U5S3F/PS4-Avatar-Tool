@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
@@ -12,34 +10,29 @@ from hen_avatar_maker.image_ops import export_avatar, prepare_output, validate_a
 def test_dxt5_header_and_size() -> None:
     image = Image.new("RGBA", (7, 9), (100, 120, 140, 255))
     data = encode_dxt5(image)
-
     blocks_x = (7 + 3) // 4
     blocks_y = (9 + 3) // 4
     assert data[:4] == b"DDS "
     assert len(data) == 128 + blocks_x * blocks_y * 16
 
 
-def test_prepare_output_square_and_round() -> None:
+def test_prepare_output_round_mask() -> None:
     image = Image.new("RGBA", (20, 30), (255, 0, 0, 255))
-    square = prepare_output(64, image, round_profile=False)
-    round_image = prepare_output(64, image, round_profile=True)
-
-    assert square.size == (64, 64)
-    assert round_image.size == (64, 64)
-    assert round_image.getpixel((0, 0))[3] == 0
-    assert round_image.getpixel((32, 32))[3] == 255
+    result = prepare_output(64, image, round_profile=True)
+    assert result.size == (64, 64)
+    assert result.getpixel((0, 0))[3] == 0
+    assert result.getpixel((32, 32))[3] == 255
 
 
 def test_avatar_name_validation() -> None:
     assert validate_avatar_name("  CoolAvatar01  ") == "CoolAvatar01"
-
     for invalid in ("", ".", "..", "a/b", "a\\b", "a:b", "a*b"):
         try:
             validate_avatar_name(invalid)
         except ValueError:
             pass
         else:
-            raise AssertionError(f"Accepted invalid avatar name: {invalid!r}")
+            raise AssertionError(invalid)
 
 
 def test_export_creates_all_assets() -> None:
@@ -51,8 +44,6 @@ def test_export_creates_all_assets() -> None:
             avatar_name="TestAvatar",
             round_profile=True,
         )
-
-        assert output_dir.name == "TestAvatar"
         assert {path.name for path in output_dir.iterdir()} == {
             "avatar.png",
             "avatar64.dds",

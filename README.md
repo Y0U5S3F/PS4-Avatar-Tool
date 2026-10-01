@@ -1,29 +1,32 @@
-# HEN Avatar Maker
+# HEN Avatar Maker — PyQt6
 
-A maintainable desktop GUI for creating PS4 HEN avatar files from ordinary images.
+A polished Windows-oriented desktop UI for creating PS4 HEN avatar files from any supported image.
 
-## Why this implementation
+## UI stack
 
-The first version used Tkinter/Canvas heavily. That made exact widget sizing and platform rendering harder to control, which is what caused the overlapping switch label and cramped profile selectors seen in the screenshot.
+- **PyQt6 / Qt 6 Widgets** for the desktop UI and high-DPI rendering.
+- **Pillow** for robust image decoding, EXIF orientation, output resizing, masking, and DDS generation.
+- **Custom QPainter widgets** for the crop overlay, import drop zone, toggle, folder icon, and profile selectors.
 
-This revision keeps the runtime dependency set small, but treats the UI as a set of dedicated components rather than one large widget. The import target is an independent widget, the crop editor owns crop state, and image/export code stays outside the UI layer.
+## Why the rewrite
 
-For a larger production application, **PySide6 (Qt for Python)** would be my preferred UI toolkit because it gives you a stronger layout engine, high-DPI rendering, native desktop controls, accessibility support, and a much cleaner path to more complex views. I did not switch this build to an uninstalled dependency and pretend it was tested; this build is the one verified in the available runtime.
+The previous version used Tkinter `Canvas` for both UI composition and image rendering. This version uses Qt layouts for sizing and a dedicated painted crop editor so controls do not overlap and image movement does not require rebuilding the entire UI hierarchy.
 
-## Architecture
+## Layout
 
 ```text
-HEN_avatar_maker_gui.py      compatibility launcher
-main.py                      application entry point
+HEN_avatar_maker_gui.py
 hen_avatar_maker/
-├── app.py                   UI composition + user actions
-├── widgets.py               reusable controls
-├── crop_view.py             pan / zoom / crop interaction
-├── image_ops.py             image loading + output preparation
-├── dxt5.py                  pure-Python DDS/DXT5 encoder
-└── config.py                theme + application constants
-tests/
-└── test_core.py             core image/export tests
+├── app.py                # QApplication lifecycle
+├── config.py             # constants/theme
+├── dxt5.py               # pure-Python DDS/DXT5 encoder
+├── image_ops.py          # image loading + export
+├── qt_image.py           # Pillow -> QImage ownership conversion
+└── ui/
+    ├── crop_editor.py    # pan/zoom/crop viewport
+    ├── main_window.py    # screen composition + commands
+    ├── styles.py         # central QSS
+    └── widgets.py        # reusable controls
 ```
 
 ## Run
@@ -33,11 +36,11 @@ python -m pip install -r requirements.txt
 python HEN_avatar_maker_gui.py
 ```
 
-## Test
+Drag-and-drop of a local image is supported in the import area. The crop editor supports mouse dragging and wheel zoom.
 
-```bash
-python -m pip install -r requirements-dev.txt
-python -m pytest
-```
+## Quality notes
 
-The verified build passes 4 automated tests plus a GUI smoke capture and an export smoke check.
+- Qt's high-DPI scaling policy is enabled with `PassThrough`.
+- The crop editor caches the scaled source for the current zoom level, so dragging only repaints the scene.
+- The source image is never mutated during preview rendering.
+- Pillow remains isolated from the UI layer except where a cropped image is passed to the export service.

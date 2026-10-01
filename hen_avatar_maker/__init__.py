@@ -1,4 +1,3 @@
-"""HEN Avatar Maker application package."""
+"""HEN Avatar Maker (PyQt6)."""
 
-__all__ = ["__version__"]
-__version__ = "1.0.0"
+__version__ = "2.0.0"

@@ -32,18 +32,15 @@ def validate_avatar_name(name: str) -> str:
 
 def apply_round_mask(image: Image.Image) -> Image.Image:
     result = image.convert("RGBA")
-    size = result.width
-    mask = Image.new("L", (size, size), 0)
-    ImageDraw.Draw(mask).ellipse((0, 0, size - 1, size - 1), fill=255)
+    mask = Image.new("L", result.size, 0)
+    ImageDraw.Draw(mask).ellipse((0, 0, result.width - 1, result.height - 1), fill=255)
     result.putalpha(mask)
     return result
 
 
 def prepare_output(size: int, cropped: Image.Image, round_profile: bool) -> Image.Image:
     result = cropped.resize((size, size), Image.Resampling.LANCZOS).convert("RGBA")
-    if round_profile:
-        result = apply_round_mask(result)
-    return result
+    return apply_round_mask(result) if round_profile else result
 
 
 def export_avatar(
@@ -54,12 +51,12 @@ def export_avatar(
     round_profile: bool,
 ) -> Path:
     safe_name = validate_avatar_name(avatar_name)
-    parent = Path(output_parent)
-    output_dir = parent / safe_name
+    output_dir = Path(output_parent) / safe_name
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    avatar_png = prepare_output(440, cropped, round_profile)
-    avatar_png.save(output_dir / "avatar.png", format="PNG", optimize=True)
+    prepare_output(440, cropped, round_profile).save(
+        output_dir / "avatar.png", format="PNG", optimize=True
+    )
 
     for filename, size in OUTPUT_SIZES.items():
         save_dxt5(prepare_output(size, cropped, round_profile), output_dir / filename)

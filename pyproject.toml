@@ -4,15 +4,20 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "hen-avatar-maker"
-version = "1.0.0"
-description = "Desktop PS4 HEN avatar maker"
+version = "2.0.0"
+description = "Modern PyQt6 PS4 HEN avatar maker"
 requires-python = ">=3.10"
-dependencies = ["Pillow>=10.0"]
-
-[tool.setuptools.packages.find]
-include = ["hen_avatar_maker*"]
+dependencies = [
+    "PyQt6>=6.7,<7",
+    "Pillow>=10.0,<13",
+]
 
 [tool.pytest.ini_options]
-pythonpath = ["."]
 testpaths = ["tests"]
-addopts = "-q"
+pythonpath = ["."]
+
+[tool.ruff]
+line-length = 110
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]

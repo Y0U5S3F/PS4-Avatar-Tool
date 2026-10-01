@@ -44,12 +44,8 @@ def _color_palette(c0: int, c1: int) -> list[tuple[int, int, int]]:
 def _choose_color_endpoints(
     pixels: list[tuple[int, int, int, int]],
 ) -> tuple[int, int]:
-    rs = [pixel[0] for pixel in pixels]
-    gs = [pixel[1] for pixel in pixels]
-    bs = [pixel[2] for pixel in pixels]
-
-    min_rgb = (min(rs), min(gs), min(bs))
-    max_rgb = (max(rs), max(gs), max(bs))
+    min_rgb = tuple(min(pixel[channel] for pixel in pixels) for channel in range(3))
+    max_rgb = tuple(max(pixel[channel] for pixel in pixels) for channel in range(3))
 
     c0 = _rgb565_from_rgb(*max_rgb)
     c1 = _rgb565_from_rgb(*min_rgb)
@@ -64,23 +60,20 @@ def _choose_color_endpoints(
 def _encode_color_block(pixels: list[tuple[int, int, int, int]]) -> bytes:
     c0, c1 = _choose_color_endpoints(pixels)
     palette = _color_palette(c0, c1)
-
     indices: list[int] = []
-    for r, g, b, _alpha in pixels:
-        best_index = min(
+
+    for red, green, blue, _alpha in pixels:
+        best = min(
             range(4),
-            key=lambda index: (
-                (r - palette[index][0]) ** 2
-                + (g - palette[index][1]) ** 2
-                + (b - palette[index][2]) ** 2
+            key=lambda i: (
+                (red - palette[i][0]) ** 2
+                + (green - palette[i][1]) ** 2
+                + (blue - palette[i][2]) ** 2
             ),
         )
-        indices.append(best_index)
+        indices.append(best)
 
-    packed = 0
-    for index_position, index in enumerate(indices):
-        packed |= (index & 0x3) << (2 * index_position)
-
+    packed = sum((index & 0x3) << (2 * i) for i, index in enumerate(indices))
     return struct.pack("<HHI", c0, c1, packed)
 
 
@@ -96,7 +89,6 @@ def _alpha_palette(a0: int, a1: int) -> list[int]:
             (2 * a0 + 5 * a1) // 7,
             (a0 + 6 * a1) // 7,
         ]
-
     return [
         a0,
         a1,
@@ -111,35 +103,20 @@ def _alpha_palette(a0: int, a1: int) -> list[int]:
 
 def _encode_alpha_block(pixels: list[tuple[int, int, int, int]]) -> bytes:
     alphas = [pixel[3] for pixel in pixels]
-    low = min(alphas)
-    high = max(alphas)
-
+    low, high = min(alphas), max(alphas)
     if low == high:
-        if high < 255:
-            a0, a1 = high + 1, low
-        else:
-            a0, a1 = 255, 254
+        a0, a1 = (high + 1, low) if high < 255 else (255, 254)
     else:
         a0, a1 = high, low
 
     palette = _alpha_palette(a0, a1)
-    indices: list[int] = []
-    for alpha in alphas:
-        best_index = min(
-            range(8),
-            key=lambda index: (alpha - palette[index]) ** 2,
-        )
-        indices.append(best_index)
-
-    packed = 0
-    for index_position, index in enumerate(indices):
-        packed |= (index & 0x7) << (3 * index_position)
-
+    indices = [min(range(8), key=lambda i: (alpha - palette[i]) ** 2) for alpha in alphas]
+    packed = sum((index & 0x7) << (3 * i) for i, index in enumerate(indices))
     return bytes((a0, a1)) + packed.to_bytes(6, "little")
 
 
 def encode_dxt5(image: Image.Image) -> bytes:
-    """Return a complete DDS file containing one DXT5 mip level."""
+    """Return a complete single-mip-level DDS file encoded as DXT5."""
     rgba = image.convert("RGBA")
     width, height = rgba.size
     pixels = rgba.load()
@@ -147,28 +124,15 @@ def encode_dxt5(image: Image.Image) -> bytes:
 
     for block_y in range(0, height, 4):
         for block_x in range(0, width, 4):
-            block: list[tuple[int, int, int, int]] = []
-            for y in range(4):
-                source_y = min(block_y + y, height - 1)
-                for x in range(4):
-                    source_x = min(block_x + x, width - 1)
-                    block.append(pixels[source_x, source_y])
-
+            block = [
+                pixels[min(block_x + x, width - 1), min(block_y + y, height - 1)]
+                for y in range(4)
+                for x in range(4)
+            ]
             encoded += _encode_alpha_block(block)
             encoded += _encode_color_block(block)
 
-    pixel_format = struct.pack(
-        "<II4s5I",
-        32,
-        0x00000004,
-        b"DXT5",
-        0,
-        0,
-        0,
-        0,
-        0,
-    )
-
+    pixel_format = struct.pack("<II4s5I", 32, 0x00000004, b"DXT5", 0, 0, 0, 0, 0)
     header = bytearray(b"DDS ")
     header += struct.pack(
         "<I6I",
@@ -186,7 +150,6 @@ def encode_dxt5(image: Image.Image) -> bytes:
 
     if len(header) != 128:
         raise AssertionError("DDS header must be exactly 128 bytes")
-
     return bytes(header) + bytes(encoded)
 
 
