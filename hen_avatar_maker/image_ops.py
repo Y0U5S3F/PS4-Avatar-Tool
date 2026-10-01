@@ -27,6 +27,8 @@ def validate_avatar_name(name: str) -> str:
         raise ValueError("Enter an avatar folder name first.")
     if value in {".", ".."} or any(char in INVALID_FOLDER_CHARS for char in value):
         raise ValueError("The avatar folder name contains invalid Windows characters.")
+    if value.endswith((" ", ".")):
+        raise ValueError("The avatar folder name cannot end with a space or period on Windows.")
     return value
 
 

@@ -1,1 +1,1 @@
-"""Qt user interface components."""
+"""Qt UI components for HEN Avatar Maker."""

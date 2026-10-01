@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "hen-avatar-maker"
-version = "2.0.0"
-description = "Modern PyQt6 PS4 HEN avatar maker"
+version = "2.1.0"
+description = "PyQt6 PS4 HEN avatar maker"
 requires-python = ">=3.10"
 dependencies = [
     "PyQt6>=6.7,<7",

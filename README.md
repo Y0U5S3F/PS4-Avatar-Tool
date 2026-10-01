@@ -1,46 +1,56 @@
 # HEN Avatar Maker — PyQt6
 
-A polished Windows-oriented desktop UI for creating PS4 HEN avatar files from any supported image.
+A maintainable PyQt6 rewrite of the HEN Avatar Maker desktop UI.
 
-## UI stack
+## Requirements
 
-- **PyQt6 / Qt 6 Widgets** for the desktop UI and high-DPI rendering.
-- **Pillow** for robust image decoding, EXIF orientation, output resizing, masking, and DDS generation.
-- **Custom QPainter widgets** for the crop overlay, import drop zone, toggle, folder icon, and profile selectors.
+- Python 3.10+
+- PyQt6 6.7+
+- Pillow 10+
 
-## Why the rewrite
-
-The previous version used Tkinter `Canvas` for both UI composition and image rendering. This version uses Qt layouts for sizing and a dedicated painted crop editor so controls do not overlap and image movement does not require rebuilding the entire UI hierarchy.
-
-## Layout
+Install dependencies:
 
 ```text
-HEN_avatar_maker_gui.py
-hen_avatar_maker/
-├── app.py                # QApplication lifecycle
-├── config.py             # constants/theme
-├── dxt5.py               # pure-Python DDS/DXT5 encoder
-├── image_ops.py          # image loading + export
-├── qt_image.py           # Pillow -> QImage ownership conversion
-└── ui/
-    ├── crop_editor.py    # pan/zoom/crop viewport
-    ├── main_window.py    # screen composition + commands
-    ├── styles.py         # central QSS
-    └── widgets.py        # reusable controls
+python -m pip install -r requirements.txt
 ```
 
-## Run
+Start the application:
 
-```bash
-python -m pip install -r requirements.txt
+```text
 python HEN_avatar_maker_gui.py
 ```
 
-Drag-and-drop of a local image is supported in the import area. The crop editor supports mouse dragging and wheel zoom.
+On Windows, the launcher also catches startup errors and displays a message box instead of silently closing. Runtime exceptions are logged to:
 
-## Quality notes
+```text
+%USERPROFILE%\HEN Avatar Maker\logs\application.log
+```
 
-- Qt's high-DPI scaling policy is enabled with `PassThrough`.
-- The crop editor caches the scaled source for the current zoom level, so dragging only repaints the scene.
-- The source image is never mutated during preview rendering.
-- Pillow remains isolated from the UI layer except where a cropped image is passed to the export service.
+## Architecture
+
+```text
+HEN_avatar_maker_gui.py      Safe desktop entry point
+hen_avatar_maker/
+├── app.py                   QApplication lifecycle + fatal-error handling
+├── config.py                Theme and application constants
+├── dxt5.py                  DDS/DXT5 encoder
+├── image_ops.py             Pillow loading, masks, and export
+├── qt_image.py              Pillow → Qt image conversion
+└── ui/
+    ├── crop_editor.py       Image pan/zoom/crop renderer
+    ├── main_window.py       Window composition and application state
+    ├── styles.py            Global Qt stylesheet
+    └── widgets.py           Reusable custom widgets
+```
+
+The crop editor renders the source QPixmap through a `QPainter` transform rather than repeatedly creating resized raster copies while dragging. Vector overlays and controls use explicit `QColor` objects so Qt painting APIs receive the correct types.
+
+## Validation
+
+Run the core tests with:
+
+```text
+python -m pytest
+```
+
+The repository intentionally does not include generated caches or temporary smoke-test artifacts.

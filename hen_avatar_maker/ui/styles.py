@@ -13,10 +13,6 @@ def build_stylesheet() -> str:
         font-size: 9pt;
     }}
 
-    QLabel {{
-        color: {t.text};
-    }}
-
     QLineEdit {{
         background: {t.panel_alt};
         color: {t.text};
@@ -45,6 +41,12 @@ def build_stylesheet() -> str:
 
     QPushButton:hover {{ background: {t.border_light}; }}
     QPushButton:pressed {{ background: {t.border}; }}
+    QPushButton:disabled {{ background: #24262c; color: #6f7480; }}
 
-    QScrollBar {{ width: 0; height: 0; }}
+    QToolTip {{
+        background: #24262c;
+        color: {t.text};
+        border: 1px solid {t.border};
+        padding: 5px;
+    }}
     """
