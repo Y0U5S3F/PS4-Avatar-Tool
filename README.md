@@ -1,56 +1,41 @@
-# HEN Avatar Maker — PyQt6
+# PS4 Avatar Tool — PyQt6
 
-A maintainable PyQt6 rewrite of the HEN Avatar Maker desktop UI.
+PyQt6 desktop application for creating PS4 Avatar assets from an image.
 
-## Requirements
+## Important runtime fix in 2.2.0
 
-- Python 3.10+
-- PyQt6 6.7+
-- Pillow 10+
+The GUI uses explicit `QPainter.begin()` / `QPainter.end()` ownership with `try/finally` in every custom-painted widget. The Qt application also catches exceptions at the event-dispatch boundary and defers diagnostic dialogs until the current event has completed.
 
-Install dependencies:
+This avoids the common failure mode where an exception inside `paintEvent()` leaves the Qt backing store in an active-painter state and produces repeated messages such as:
+
+```text
+QBackingStore::endPaint() called with active painter; did you forget to destroy it or call QPainter::end() on it?
+```
+
+Custom painting has been reduced to the crop editor, toggle, and import drop zone. The folder button now uses Qt's native folder icon instead of a second custom paint path.
+
+## Install
 
 ```text
 python -m pip install -r requirements.txt
 ```
 
-Start the application:
+## Run
 
 ```text
-python HEN_avatar_maker_gui.py
+python ps4_avatar_tool_gui.py
 ```
 
-On Windows, the launcher also catches startup errors and displays a message box instead of silently closing. Runtime exceptions are logged to:
+For debugging on Windows, use `run_debug.bat` so the console stays open after a failure.
 
-```text
-%USERPROFILE%\HEN Avatar Maker\logs\application.log
-```
-
-## Architecture
-
-```text
-HEN_avatar_maker_gui.py      Safe desktop entry point
-hen_avatar_maker/
-├── app.py                   QApplication lifecycle + fatal-error handling
-├── config.py                Theme and application constants
-├── dxt5.py                  DDS/DXT5 encoder
-├── image_ops.py             Pillow loading, masks, and export
-├── qt_image.py              Pillow → Qt image conversion
-└── ui/
-    ├── crop_editor.py       Image pan/zoom/crop renderer
-    ├── main_window.py       Window composition and application state
-    ├── styles.py            Global Qt stylesheet
-    └── widgets.py           Reusable custom widgets
-```
-
-The crop editor renders the source QPixmap through a `QPainter` transform rather than repeatedly creating resized raster copies while dragging. Vector overlays and controls use explicit `QColor` objects so Qt painting APIs receive the correct types.
-
-## Validation
-
-Run the core tests with:
+## Tests
 
 ```text
 python -m pytest
 ```
 
-The repository intentionally does not include generated caches or temporary smoke-test artifacts.
+## Logs
+
+```text
+%USERPROFILE%\\PS4 Avatar Tool\\logs\\application.log
+```

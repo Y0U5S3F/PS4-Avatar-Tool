@@ -1,1 +1,1 @@
-"""Qt UI components for HEN Avatar Maker."""
+"""Qt UI components for PS4 Avatar Tool."""

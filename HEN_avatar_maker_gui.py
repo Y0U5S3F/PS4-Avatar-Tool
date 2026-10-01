@@ -1,4 +1,4 @@
-"""Safe desktop entry point for HEN Avatar Maker."""
+"""Safe desktop entry point for PS4 Avatar Tool."""
 
 from __future__ import annotations
 
@@ -8,12 +8,12 @@ import traceback
 
 def main() -> int:
     try:
-        from hen_avatar_maker.app import run
+        from ps4_avatar_tool.app import run
 
         return run()
     except Exception as exc:  # Last-resort startup guard for double-click launches.
         message = (
-            "HEN Avatar Maker could not start.\n\n"
+            "PS4 Avatar Tool could not start.\n\n"
             f"Error: {exc}\n\n"
             "Run the application from a terminal to see the full traceback."
         )
@@ -23,7 +23,7 @@ def main() -> int:
             try:
                 import ctypes
 
-                ctypes.windll.user32.MessageBoxW(0, message, "HEN Avatar Maker", 0x10)
+                ctypes.windll.user32.MessageBoxW(0, message, "PS4 Avatar Tool", 0x10)
             except Exception:
                 pass
         return 1

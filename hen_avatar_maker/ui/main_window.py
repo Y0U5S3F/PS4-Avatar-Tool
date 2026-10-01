@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from PIL import Image
-from PyQt6.QtCore import QTimer, Qt
+from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
     QFileDialog,
     QFrame,
@@ -30,7 +30,7 @@ from ..config import (
 from ..image_ops import ImageLoadError, export_avatar, load_image, validate_avatar_name
 from .crop_editor import CropEditor
 from .styles import build_stylesheet
-from .widgets import Card, IconButton, ImportDropZone, ProfilePreview, ToggleSwitch
+from .widgets import Card, IconButton, ImportDropZone, ToggleSwitch
 
 
 class MainWindow(QMainWindow):
@@ -43,7 +43,6 @@ class MainWindow(QMainWindow):
 
         self.export_dir: Path | None = None
         self.round_profile = False
-        self._preview_update_pending = False
 
         root = QWidget()
         root.setObjectName("Root")
@@ -78,6 +77,8 @@ class MainWindow(QMainWindow):
         self.drop_zone = ImportDropZone(self.crop_editor)
         self.drop_zone.clicked.connect(self.import_image)
         self.drop_zone.fileDropped.connect(self.load_image_path)
+        self.zoom_bar = self._build_zoom_bar()
+        self._update_tool_buttons()
         self._sync_drop_zone()
         content.addWidget(self.crop_container, 1)
 
@@ -175,7 +176,7 @@ class MainWindow(QMainWindow):
         layout.addWidget(title)
 
         row = QHBoxLayout()
-        row.setContentsMargins(0, 13, 0, 12)
+        row.setContentsMargins(0, 13, 0, 0)
         row.setSpacing(9)
         self.toggle = ToggleSwitch(False)
         self.toggle.toggled.connect(self._set_round_profile)
@@ -186,28 +187,62 @@ class MainWindow(QMainWindow):
         row.addStretch(1)
         layout.addLayout(row)
 
-        previews = QHBoxLayout()
-        previews.setContentsMargins(0, 0, 0, 0)
-        previews.setSpacing(8)
-        self.square_preview = ProfilePreview(False)
-        self.square_preview.clicked.connect(self._select_shape)
-        self.round_preview = ProfilePreview(True)
-        self.round_preview.clicked.connect(self._select_shape)
-        previews.addWidget(self.square_preview)
-        or_label = QLabel("or")
-        or_label.setStyleSheet(f"color: {THEME.muted}; font-size: 8pt;")
-        previews.addWidget(or_label, 0, Qt.AlignmentFlag.AlignVCenter)
-        previews.addWidget(self.round_preview)
-        previews.addStretch(1)
-        layout.addLayout(previews)
-        self._update_preview_selection()
         return card
+
+    def _build_zoom_bar(self) -> QFrame:
+        """Small floating bar, bottom-right of the image area: rotate | - | zoom % | +"""
+        bar = QFrame(self.crop_editor)
+        bar.setObjectName("ZoomBar")
+        bar.setAttribute(Qt.WidgetAttribute.WA_NoMousePropagation, True)
+        bar.setStyleSheet(
+            f"""
+            QFrame#ZoomBar {{ background: rgba(16, 18, 22, 215); border: 1px solid {THEME.border}; border-radius: 6px; }}
+            QFrame#ZoomBar QPushButton {{
+                background: {THEME.panel_alt}; color: {THEME.text}; border: 0; border-radius: 4px;
+                padding: 0; font-size: 13pt; font-weight: 600;
+            }}
+            QFrame#ZoomBar QPushButton:hover {{ background: {THEME.border_light}; }}
+            QFrame#ZoomBar QPushButton:pressed {{ background: {THEME.border}; }}
+            QFrame#ZoomBar QPushButton:disabled {{ background: #24262c; color: #5b606b; }}
+            QFrame#ZoomBar QLabel {{ color: {THEME.text}; font-size: 9pt; font-weight: 600; background: transparent; }}
+            """
+        )
+        layout = QHBoxLayout(bar)
+        layout.setContentsMargins(6, 6, 6, 6)
+        layout.setSpacing(6)
+
+        def square_button(text: str, tooltip: str) -> QPushButton:
+            button = QPushButton(text)
+            button.setFixedSize(30, 30)
+            button.setToolTip(tooltip)
+            button.setAccessibleName(tooltip)
+            button.setCursor(Qt.CursorShape.PointingHandCursor)
+            button.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+            return button
+
+        self.rotate_button = square_button("\u21bb", "Rotate 90\u00b0 clockwise")
+        self.rotate_button.clicked.connect(self._rotate_image)
+        self.zoom_out_button = square_button("\u2212", "Zoom out")
+        self.zoom_out_button.clicked.connect(self.crop_editor.zoom_out)
+        self.zoom_label = QLabel("100%")
+        self.zoom_label.setFixedWidth(50)
+        self.zoom_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.zoom_in_button = square_button("+", "Zoom in")
+        self.zoom_in_button.clicked.connect(self.crop_editor.zoom_in)
+
+        layout.addWidget(self.rotate_button)
+        layout.addWidget(self.zoom_out_button)
+        layout.addWidget(self.zoom_label)
+        layout.addWidget(self.zoom_in_button)
+        bar.adjustSize()
+        bar.hide()
+        return bar
 
     def _export_card(self) -> Card:
         card = Card()
         layout = QVBoxLayout(card)
         layout.setContentsMargins(9, 9, 9, 9)
-        self.export_button = QPushButton("Create & Export Avatar")
+        self.export_button = QPushButton("Create && Export Avatar")
         self.export_button.setCursor(Qt.CursorShape.PointingHandCursor)
         self.export_button.setMinimumHeight(54)
         self.export_button.setEnabled(False)
@@ -225,6 +260,7 @@ class MainWindow(QMainWindow):
         return card
 
     def _sync_drop_zone(self) -> None:
+        self._place_zoom_bar()
         if self.crop_editor.has_image:
             self.drop_zone.hide()
             return
@@ -236,6 +272,20 @@ class MainWindow(QMainWindow):
         x = max(0, (self.crop_editor.width() - self.drop_zone.width()) // 2)
         y = max(0, (self.crop_editor.height() - self.drop_zone.height()) // 2 - 6)
         self.drop_zone.move(x, y)
+
+    def _place_zoom_bar(self) -> None:
+        has_image = self.crop_editor.has_image
+        self.zoom_bar.setVisible(has_image)
+        if not has_image:
+            return
+        margin = 12
+        self.zoom_bar.adjustSize()
+        self.zoom_bar.move(
+            max(0, self.crop_editor.width() - self.zoom_bar.width() - margin),
+            max(0, self.crop_editor.height() - self.zoom_bar.height() - margin),
+        )
+        self.zoom_bar.raise_()
+        self._update_tool_buttons()
 
     def import_image(self) -> None:
         path, _ = QFileDialog.getOpenFileName(self, "Import image", "", SUPPORTED_IMAGE_FILTER)
@@ -253,7 +303,6 @@ class MainWindow(QMainWindow):
         self._sync_drop_zone()
         self.export_button.setEnabled(True)
         self._set_status(f"Loaded {Path(path).name}  •  {image.width}×{image.height}")
-        self._update_previews()
 
     def choose_export_dir(self) -> None:
         path = QFileDialog.getExistingDirectory(self, "Choose export location")
@@ -262,44 +311,29 @@ class MainWindow(QMainWindow):
             self.location_input.setText(str(self.export_dir))
             self._set_status(f"Export location set to {self.export_dir}")
 
-    def _select_shape(self, round_mode: bool) -> None:
-        self.toggle.setChecked(round_mode)
-
     def _set_round_profile(self, enabled: bool) -> None:
         self.round_profile = bool(enabled)
         self.crop_editor.set_round(self.round_profile)
-        self._update_preview_selection()
         self._set_status(("Round" if enabled else "Square") + " profile picture mode selected")
 
-    def _update_preview_selection(self) -> None:
-        self.square_preview.setSelected(not self.round_profile)
-        self.round_preview.setSelected(self.round_profile)
-
     def _on_zoom_changed(self, scale: float) -> None:
-        self._set_status(f"Zoom {scale:.2f}×  •  Drag to reposition")
+        self._update_tool_buttons()
+        self._set_status(f"Zoom {self._zoom_percent():.0f}%  •  Drag to reposition")
 
-    def _schedule_preview_update(self) -> None:
-        if self._preview_update_pending:
-            return
-        self._preview_update_pending = True
-        QTimer.singleShot(60, self._flush_preview_update)
+    def _rotate_image(self) -> None:
+        self.crop_editor.rotate_clockwise()
+        self._set_status("Rotated 90° clockwise  •  Drag to reposition")
 
-    def _flush_preview_update(self) -> None:
-        self._preview_update_pending = False
-        self._update_previews()
+    def _zoom_percent(self) -> float:
+        editor = self.crop_editor
+        return editor.scale / editor.min_scale() * 100.0 if editor.has_image else 100.0
 
-    def _update_previews(self) -> None:
-        if not self.crop_editor.has_image:
-            self.square_preview.setImage(None)
-            self.round_preview.setImage(None)
-            return
-        try:
-            crop = self.crop_editor.get_cropped_image()
-        except RuntimeError:
-            return
-        self.square_preview.setImage(crop)
-        self.round_preview.setImage(crop)
-        self._update_preview_selection()
+    def _update_tool_buttons(self) -> None:
+        editor = self.crop_editor
+        self.zoom_label.setText(f"{self._zoom_percent():.0f}%")
+        self.zoom_in_button.setEnabled(editor.can_zoom_in())
+        self.zoom_out_button.setEnabled(editor.can_zoom_out())
+        self.rotate_button.setEnabled(editor.has_image)
 
     def export_current_avatar(self) -> None:
         try:

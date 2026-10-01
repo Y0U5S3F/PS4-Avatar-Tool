@@ -43,8 +43,8 @@ class Theme:
 
 THEME = Theme()
 
-APP_TITLE = "HEN Avatar Maker"
-APP_SUBTITLE = "Create a PS4 HEN avatar from any image."
+APP_TITLE = "PS4 Avatar Tool"
+APP_SUBTITLE = "Create a PS4 Avatar from any image."
 WINDOW_SIZE = (1024, 720)
 WINDOW_MIN_SIZE = (900, 650)
 SIDEBAR_WIDTH = 310
