@@ -90,8 +90,8 @@ def create_application() -> SafeApplication:
     )
     app = SafeApplication(sys.argv)
     app.setApplicationName(APP_TITLE)
-    app.setOrganizationName("HEN Tools")
-    app.setApplicationVersion("2.2.0")
+    app.setOrganizationName("DJO'S")
+    app.setApplicationVersion("1.0.0")
     return app
 
 

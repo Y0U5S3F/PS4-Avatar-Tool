@@ -2,7 +2,7 @@
 
 PyQt6 desktop application for creating PS4 Avatar assets from an image.
 
-## Important runtime fix in 2.2.0
+## Important runtime fix in 1.0.0
 
 The GUI uses explicit `QPainter.begin()` / `QPainter.end()` ownership with `try/finally` in every custom-painted widget. The Qt application also catches exceptions at the event-dispatch boundary and defers diagnostic dialogs until the current event has completed.
 
